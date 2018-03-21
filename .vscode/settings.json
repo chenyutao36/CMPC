@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "stdlib.h": "c",
+        "full_condensing.h": "c",
+        "stdio.h": "c",
+        "qpsolver_qore.h": "c"
+    }
+}
