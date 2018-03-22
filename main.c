@@ -44,10 +44,6 @@ int main()
     size.nbg = nbg;
     size.nbgN = nbgN;
     size.N = N;
-
-    rti_opt opt;
-    opt.qpsolver=1;
-    opt.shifting=1;
     
     double *x0 = calloc(nx, sizeof(double));
 
@@ -132,6 +128,10 @@ int main()
     
     rti_work->sample = 0;
     rti_step_init(&size, rti_work);
+
+    rti_opt opt;
+    opt.qpsolver=0;
+    opt.shifting=1;
     
     CMPC_timer t;
     double *xf = malloc(nx*sizeof(double));

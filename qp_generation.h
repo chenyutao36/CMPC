@@ -58,6 +58,8 @@ qp_out* qp_out_create(model_size *size);
 int qp_generation(qp_in *in, model_size *size, 
     qp_problem *qp, qp_out *out, qp_generation_workspace *work);
 
+int expand(model_size *size, qp_problem *qp, qp_out *out);
+
 void qp_in_free(qp_in *in);
 void qp_problem_free(qp_problem *qp);
 void qp_generation_workspace_free(qp_generation_workspace *work);

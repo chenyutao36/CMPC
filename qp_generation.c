@@ -10,6 +10,7 @@
 
 extern void dgemm_(char*, char*, int*, int*, int*, double*, double*, int*, double*, int*, double*, double*, int*);
 extern void dsyrk_(char*, char*, int*, int*, double*, double*, int*, double*, double*, int*);
+extern void dgemv_(char*, int*, int*, double*, double*, int*, double*, int*, double*, double*, int*);
 
 qp_in* qp_in_create(model_size *size)
 {
@@ -284,6 +285,50 @@ int qp_generation(qp_in *in, model_size *size,
     return 0;
     
 }
+
+int expand(model_size *size, qp_problem *qp, qp_out *out)
+ {
+    int nx = size->nx;
+    int nu = size->nu;
+    int N = size->N;
+    // int nbg = size->nbg;
+    // int nbgN = size->nbgN;
+
+    double *dx = out->dx;
+    double *du = out->du;
+    // double *lambda = out->lam;
+    // double *mu = out->mu;
+
+    double *A = qp->A;
+    double *B = qp->B;
+    // double *Q = qp->Q;
+    // double *S = qp->S;
+    // double *R = qp->R;
+    // double *C = qp->C;
+    // double *CN = qp->CN;
+
+    // double *gx = qp->gx;
+    double *b = qp->b;
+
+    int i;
+    char *nTrans = "N";
+    double one_d = 1.0;
+    int one_i = 1;
+
+    for(i=0;i<N;i++){
+        memcpy(dx+(i+1)*nx, b+i*nx, nx*sizeof(double));          
+        dgemv_(nTrans,&nx,&nx,&one_d,A+i*nx*nx,&nx,dx+i*nx,&one_i,&one_d,dx+(i+1)*nx,&one_i);
+        dgemv_(nTrans,&nx,&nu,&one_d,B+i*nx*nu,&nx,du+i*nu,&one_i,&one_d,dx+(i+1)*nx,&one_i);
+    }
+
+    // memcpy(lambda+N*nx, gx+N*nx, nx*sizeof(double));
+    // dgemv(nTrans,&nx,&nx,&one_d,Q+N*nx*nx,&nx,dx+N*nx,&one_i,&one_d,lambda+N*nx,&one_i);
+    // if (nbgN>0){
+    //     dgemv(Trans,&nbgN,&nx,&one_d,CN,&nbgN,muN,&one_i,&one_d,lambda+N*nx,&one_i);
+    // }
+
+    return 0;
+ }
 
 void qp_in_free(qp_in *in){
     free(in->x);

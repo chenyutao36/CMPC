@@ -86,9 +86,13 @@ int rti_step(double *x0, model_size *size, rti_opt *opt, rti_step_workspace *rti
         
             tqore=CMPC_tic(tqore);
             qpsolver_qore(size, qp, full_condensing_work,
-                qore_work, rti_work->sample);
+                qore_work, out, rti_work->sample);
             tqore=CMPC_toc(tqore);
             rti_work->cpt_qp_dense = tqore.t;
+
+            memcpy(out->dx, dx0, nx*sizeof(double));
+            expand(size, qp, out);
+
             break;
         case 1:
             rti_work->cpt_cond = 0;
@@ -104,26 +108,27 @@ int rti_step(double *x0, model_size *size, rti_opt *opt, rti_step_workspace *rti
 
     /* update solution */
     for(jj=0;jj<nx*(N+1);jj++)
-        rti_work->in->x[jj] += rti_work->out->dx[jj];
+        in->x[jj] += out->dx[jj];
 
     for(jj=0;jj<nu*N;jj++)
-        rti_work->in->u[jj] += rti_work->out->du[jj]; 
+        in->u[jj] += out->du[jj]; 
 
     /* store the first optimal input */
     for(jj=0;jj<nu;jj++)
-        rti_work->u_opt[jj] = rti_work->in->u[jj];
+        rti_work->u_opt[jj] = in->u[jj];
 
     /* apply shifting */
     if(opt->shifting){
         for(jj=0;jj<nx*N;jj++)
-            rti_work->in->x[jj] = rti_work->in->x[jj+nx];
+            in->x[jj] = in->x[jj+nx];
         for(jj=0;jj<nu*(N-1);jj++)
-            rti_work->in->u[jj] = rti_work->in->u[jj+nu];
+            in->u[jj] = in->u[jj+nu];
     }
 
 
     return 0;
 }
+
 
 void rti_step_workspace_free(rti_step_workspace *work)
 {
