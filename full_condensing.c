@@ -15,9 +15,9 @@ full_condensing_workspace* full_condensing_workspace_create(model_size *size)
 {
     int nx=size->nx;
     int nu=size->nu;
-    int ny=size->ny;
-    int nyN=size->nyN;
-    int np=size->np;
+    // int ny=size->ny;
+    // int nyN=size->nyN;
+    // int np=size->np;
     int nbg = size->nbg;
     int nbgN = size->nbgN;
     int N = size->N;
@@ -45,9 +45,9 @@ int full_condensing(double *dx0, model_size *size, qp_problem *qp, full_condensi
 {
     int nx=size->nx;
     int nu=size->nu;
-    int ny=size->ny;
-    int nyN=size->nyN;
-    int np=size->np;
+    // int ny=size->ny;
+    // int nyN=size->nyN;
+    // int np=size->np;
     int nbg = size->nbg;
     int nbgN = size->nbgN;
     int N = size->N;
@@ -63,8 +63,8 @@ int full_condensing(double *dx0, model_size *size, qp_problem *qp, full_condensi
     double *gx = qp->gx;
     double *gu = qp->gu;   
     double *b = qp->b;
-    double *lb_u = qp->lb_u;
-    double *ub_u = qp->ub_u;
+    // double *lb_u = qp->lb_u;
+    // double *ub_u = qp->ub_u;
     double *lb_g = qp->lb_g;
     double *ub_g = qp->ub_g;
 
@@ -170,6 +170,8 @@ int full_condensing(double *dx0, model_size *size, qp_problem *qp, full_condensi
         memcpy(ucc+N*nbg,ub_g+N*nbg,nbgN*sizeof(double));
         dgemv_(nTrans,&nbgN,&nx,&minus_one_d,CN,&nbgN,L+N*nx,&one_i,&one_d,ucc+N*nbg,&one_i);
     }
+
+    return 0;
 }
 
 void full_condensing_workspace_free(full_condensing_workspace* work)

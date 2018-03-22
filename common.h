@@ -15,6 +15,11 @@ typedef struct{
 }model_size;
 
 typedef struct{
+    int qpsolver; // 0:qore, 1:hpipm_ocp
+    int shifting; // 0:no, 1: yes
+}rti_opt;
+
+typedef struct{
     struct timeval tic;
     struct timeval toc;
     double t;

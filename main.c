@@ -3,6 +3,7 @@
 
 #include "rti_step.h"
 #include "common.h"
+#include "casadi_wrapper.h"
 
 #define PI 3.141592653589793
 
@@ -43,6 +44,10 @@ int main()
     size.nbg = nbg;
     size.nbgN = nbgN;
     size.N = N;
+
+    rti_opt opt;
+    opt.qpsolver=1;
+    opt.shifting=1;
     
     double *x0 = calloc(nx, sizeof(double));
 
@@ -122,51 +127,83 @@ int main()
         in->ubgN[i] = 2;
     }
 
-    /* call rti step */
+    /* start simulation */
 
     
     rti_work->sample = 0;
-
     rti_step_init(&size, rti_work);
     
-    int Nrep = 20;
-    double cpt_rti=0;
-    double cpt_prep=0, cpt_cond=0, cpt_qp_dense=0, cpt_qp_sparse=0;
     CMPC_timer t;
+    double *xf = malloc(nx*sizeof(double));
     
-    t=CMPC_tic(t);
-    for(i=0;i<Nrep;i++){
-        rti_step(x0, &size, rti_work);
-        cpt_prep += rti_work->cpt_prep;
-        cpt_cond += rti_work->cpt_cond;
-        cpt_qp_dense += rti_work->cpt_qp_dense;
-        cpt_qp_sparse += rti_work->cpt_qp_sparse;
+    double ct=0, Tf=4, Ts=0.05;
+
+    FILE *f = fopen("state_simu.dat","w");
+    if (f == NULL)
+    {
+        printf("Error opening file!\n");
+        exit(1);
+    }
+    fprintf(f, "%5.3f   ", ct);
+    for(i=0;i<nx;i++)
+        fprintf(f,"%5.3f ", x0[i]);
+    for(i=0;i<nu;i++)
+        fprintf(f,"%5.3f ", rti_work->in->u[i]);
+    fprintf(f,"\n");
+
+    double *simu_in[3];
+    double *simu_out[1];
+    simu_in[0] = x0;
+    simu_in[1] = rti_work->u_opt;
+    simu_in[2] = rti_work->in->p;
+    simu_out[0] = xf;
+
+    while(ct<Tf){
+        t=CMPC_tic(t);  
+        rti_step(x0, &size, &opt, rti_work);
+        t=CMPC_toc(t);
+
+        /* feedback to system */              
+        F_Fun(simu_in, simu_out);
 
         rti_work->sample ++;
+        ct += Ts;
+
+        for(i=0;i<nx;i++)
+            x0[i] = xf[i];
+
+        fprintf(f, "%5.3f   ", ct);
+        for(i=0;i<nx;i++)
+            fprintf(f, "%5.3f ", xf[i]);
+        for(i=0;i<nu;i++)
+            fprintf(f,"%5.3f ", rti_work->u_opt[i]);
+        fprintf(f,"\n");
+
+        printf("Time: %4.2f  ", ct);
+
+        printf("CPT:");
+        printf("%8.6f ms  ", t.t*1E3);
+
+        printf("Prep:");
+        printf("%8.6f ms ", rti_work->cpt_prep *1E3);
+
+        printf("Cond:");
+        printf("%8.6f ms ", rti_work->cpt_cond*1E3);
+
+        printf("dQP:");
+        printf("%8.6f ms ", rti_work->cpt_qp_dense*1E3);
+
+        printf("sQP:");
+        printf("%8.6f ms\n", rti_work->cpt_qp_sparse*1E3);
+
+        
     }
-    t=CMPC_toc(t);
-
-    cpt_rti = t.t;
     
-    printf("CPU Time:");
-    printf("%8.6f ms\n", cpt_rti*1E3/Nrep);
-
-    printf("QP preparation time:");
-    printf("%8.6f ms\n", cpt_prep*1E3/Nrep);
-
-    printf("Condensing time:");
-    printf("%8.6f ms\n", cpt_cond*1E3/Nrep);
-
-    printf("QORE time:");
-    printf("%8.6f ms\n", cpt_qp_dense*1E3/Nrep);
-
-    printf("HPIPM time:");
-    printf("%8.6f ms\n", cpt_qp_sparse*1E3/Nrep);
-
-    // print_vector(rti_work->qore_work->sol_qore, size.N*size.nu);
 
     /* free */
-    free(x0);    
+    free(x0);  
+    free(xf);  
+    fclose(f);
     rti_step_workspace_free(rti_work);
   
     return 0;

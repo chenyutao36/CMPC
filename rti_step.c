@@ -26,6 +26,7 @@ rti_step_workspace* rti_step_workspace_create(model_size *size)
 
 
     work->dx0 = (double*)malloc(size->nx * sizeof(double));
+    work->u_opt = (double*)calloc(size->nu , sizeof(double));
 
     return work;
 }
@@ -37,7 +38,7 @@ void rti_step_init(model_size *size, rti_step_workspace *rti_work)
     
 }
 
-int rti_step(double *x0, model_size *size, rti_step_workspace *rti_work)
+int rti_step(double *x0, model_size *size, rti_opt *opt, rti_step_workspace *rti_work)
 {
     CMPC_timer tprep;
     CMPC_timer tcond;
@@ -55,8 +56,8 @@ int rti_step(double *x0, model_size *size, rti_step_workspace *rti_work)
     qp_generation_workspace *qp_work=rti_work->qp_work;
     qp_out *out=rti_work->out;
     qpsolver_hpipm_ocp_workspace *hpipm_ocp_work = rti_work->hpipm_ocp_work;
-    // full_condensing_workspace *full_condensing_work = rti_work->full_condensing_work;
-    // qpsolver_qore_workspace *qore_work = rti_work->qore_work;
+    full_condensing_workspace *full_condensing_work = rti_work->full_condensing_work;
+    qpsolver_qore_workspace *qore_work = rti_work->qore_work;
 
     qp_work->sample = rti_work->sample;
 
@@ -74,33 +75,51 @@ int rti_step(double *x0, model_size *size, rti_step_workspace *rti_work)
     for(jj=0;jj<nx;jj++)
         dx0[jj] = x0[jj] - in->x[jj];
 
-    tcond=CMPC_tic(tcond);
-    // full_condensing(dx0, size, qp, full_condensing_work);
-    tcond=CMPC_toc(tcond);
-    rti_work->cpt_cond = tcond.t;
-    
-    tqore=CMPC_tic(tqore);
-    // qpsolver_qore(size, qp, full_condensing_work,
-        // qore_work, rti_work->sample);
-    tqore=CMPC_toc(tqore);
-    rti_work->cpt_qp_dense = tqore.t;
+    /* call qp solver */
+    switch (opt->qpsolver){
+        case 0:
+            rti_work->cpt_qp_sparse =0;
+            tcond=CMPC_tic(tcond);
+            full_condensing(dx0, size, qp, full_condensing_work);
+            tcond=CMPC_toc(tcond);
+            rti_work->cpt_cond = tcond.t;
+        
+            tqore=CMPC_tic(tqore);
+            qpsolver_qore(size, qp, full_condensing_work,
+                qore_work, rti_work->sample);
+            tqore=CMPC_toc(tqore);
+            rti_work->cpt_qp_dense = tqore.t;
+            break;
+        case 1:
+            rti_work->cpt_cond = 0;
+            rti_work->cpt_qp_dense =0;
+            thpipm=CMPC_tic(thpipm);
+            qpsolver_hpipm_ocp(size, qp, out, hpipm_ocp_work);
+            thpipm=CMPC_toc(thpipm);
+            rti_work->cpt_qp_sparse = thpipm.t;
+            break;
+        default:
+            printf("Please choose a supported QP solver!");
+    }
 
-    // print_vector(qore_work->sol_qore, N*nu);
+    /* update solution */
+    for(jj=0;jj<nx*(N+1);jj++)
+        rti_work->in->x[jj] += rti_work->out->dx[jj];
 
-    /* call hpipm */   
-    thpipm=CMPC_tic(thpipm);
-    qpsolver_hpipm_ocp(size, qp, out, hpipm_ocp_work);
-    thpipm=CMPC_toc(thpipm);
-    rti_work->cpt_qp_sparse = thpipm.t;
+    for(jj=0;jj<nu*N;jj++)
+        rti_work->in->u[jj] += rti_work->out->du[jj]; 
 
-    // printf("du=\n");
-    // print_matrix(out->du, nu, N);
+    /* store the first optimal input */
+    for(jj=0;jj<nu;jj++)
+        rti_work->u_opt[jj] = rti_work->in->u[jj];
 
-    // printf("dx=\n");
-    // print_matrix(out->dx, nx, N+1);
-
-    // printf("lam=\n");
-    // print_matrix(out->lam, nx, N+1);
+    /* apply shifting */
+    if(opt->shifting){
+        for(jj=0;jj<nx*N;jj++)
+            rti_work->in->x[jj] = rti_work->in->x[jj+nx];
+        for(jj=0;jj<nu*(N-1);jj++)
+            rti_work->in->u[jj] = rti_work->in->u[jj+nu];
+    }
 
 
     return 0;
@@ -117,6 +136,7 @@ void rti_step_workspace_free(rti_step_workspace *work)
     qpsolver_qore_workspace_free(work->qore_work);
 
     free(work->dx0);
+    free(work->u_opt);
   
     free(work);
 }

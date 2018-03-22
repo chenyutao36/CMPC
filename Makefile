@@ -4,7 +4,7 @@ BLASFEO_PATH = /opt/blasfeo
 HPIPM_PATH = /opt/hpipm
 QORE_PATH = /home/chen/Documents/Packages/QORE
 CFLAGS=-Wall 
-OPENBLAS_LIB=$(OPENBLAS_PATH)/lib/libopenblas.a 
+OPENBLAS_LIB=$(OPENBLAS_PATH)/lib/libopenblas_haswellp-r0.2.20.a 
 HPIPM_LIB =$(HPIPM_PATH)/lib/libhpipm.a
 BLASFEO_LIB= $(BLASFEO_PATH)/lib/libblasfeo.a
 QORE_LIB = $(QORE_PATH)/bin/libqpsolver_dense.a $(QORE_PATH)/bin/libkktpack_dense.a $(QORE_PATH)/bin/libqpcore.a
@@ -25,7 +25,7 @@ OBJ += qpsolver_qore.o
 all: main
 
 main: $(OBJ)
-	$(CC) $(CFLAGS) -pthread $(OBJ) -I.. -I$(OPENBLAS_PATH)/include $(OPENBLAS_LIB) -I$(HPIPM_PATH)/include -I$(BLASFEO_PATH)/include $(HPIPM_LIB) -I$(BLASFEO_PATH)/include $(BLASFEO_LIB) -I$(QORE_PATH) -I$(QORE_PATH)/QPSOLVER_DENSE/include $(QORE_LIB) -o main -lm -lrt -lblas -llapack -L$(QORE_BLAS) -lblasfeo
+	$(CC) $(CFLAGS) $(OBJ) -I.. -I$(OPENBLAS_PATH)/include $(OPENBLAS_LIB) -I$(HPIPM_PATH)/include -I$(BLASFEO_PATH)/include $(HPIPM_LIB) -I$(BLASFEO_PATH)/include $(BLASFEO_LIB) -I$(QORE_PATH) -I$(QORE_PATH)/QPSOLVER_DENSE/include $(QORE_LIB) -o main -lm -lpthread -lrt -lblas -L$(QORE_BLAS) -lblasfeo
 
 main.o: main.c
 	$(CC) $(CFLAGS) -c main.c

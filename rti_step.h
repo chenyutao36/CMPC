@@ -17,6 +17,7 @@ typedef struct{
     qpsolver_qore_workspace *qore_work;
 
     double *dx0;
+    double *u_opt;
     int sample;
 
     double cpt_rti;
@@ -30,7 +31,7 @@ rti_step_workspace* rti_step_workspace_create(model_size *size);
 
 void rti_step_init(model_size *size, rti_step_workspace *rti_work);
 
-int rti_step(double *x0, model_size *size, rti_step_workspace *rti_work);
+int rti_step(double *x0, model_size *size, rti_opt *opt, rti_step_workspace *rti_work);
 
 void rti_step_workspace_free(rti_step_workspace *work);
 

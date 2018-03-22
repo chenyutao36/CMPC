@@ -1,0 +1,68 @@
+set terminal jpeg
+set output "test.jpg"
+
+set macros
+MARGIN = "3"
+
+set multiplot
+set origin 0,0.67
+set size 0.5,0.33
+set tmargin @MARGIN
+set bmargin @MARGIN
+set lmargin @MARGIN
+set rmargin @MARGIN
+set notitle
+set key right top
+set ylabel '[m]'
+plot 'state_simu.dat' using 1:2 title "p" with lines
+
+set origin 0.5,0.67
+set size 0.5,0.33
+set tmargin @MARGIN
+set bmargin @MARGIN
+set lmargin @MARGIN
+set rmargin @MARGIN
+set notitle
+set key right top
+set ylabel '[rad]'
+plot 'state_simu.dat' using 1:3 title "theta" with lines 
+
+set origin 0,0.33
+set size 0.5,0.33
+set tmargin @MARGIN
+set bmargin @MARGIN
+set lmargin @MARGIN
+set rmargin @MARGIN
+set notitle
+set key right top
+set ylabel '[m/s]'
+plot 'state_simu.dat' using 1:4 title "v" with lines 
+
+set origin 0.5,0.33
+set size 0.5,0.33
+set tmargin @MARGIN
+set bmargin @MARGIN
+set lmargin @MARGIN
+set rmargin @MARGIN
+set notitle
+set key right top
+set ylabel '[rad/s]'
+plot 'state_simu.dat' using 1:5 title "w" with lines 
+
+set origin 0,0
+set size 1,0.33
+set tmargin @MARGIN
+set bmargin @MARGIN
+set lmargin @MARGIN
+set rmargin @MARGIN
+set notitle
+set key right top
+set xlabel 'Time[s]'
+set ylabel '[N]'
+plot 'state_simu.dat' using 1:6 title "F" with steps 
+
+unset multiplot
+
+
+
+
