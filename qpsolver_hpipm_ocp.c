@@ -5,6 +5,14 @@
 #include "qp_generation.h"
 #include "common.h"
 
+#include <blasfeo_target.h>
+#include <blasfeo_common.h>
+#include <blasfeo_v_aux_ext_dep.h>
+#include <blasfeo_d_aux_ext_dep.h>
+#include <blasfeo_i_aux_ext_dep.h>
+#include <blasfeo_d_aux.h>
+#include <blasfeo_d_blas.h>
+
 #include "hpipm_d_ocp_qp_dim.h"
 #include "hpipm_d_ocp_qp.h"
 #include "hpipm_d_ocp_qp_sol.h"
@@ -15,7 +23,6 @@ qpsolver_hpipm_ocp_workspace* qpsolver_hpipm_ocp_workspace_create(model_size *si
     int nx=size->nx;
     int nu=size->nu;
     int nbg = size->nbg;
-    int nbgN = size->nbgN;
     int N = size->N;
 
     qpsolver_hpipm_ocp_workspace *work = (qpsolver_hpipm_ocp_workspace*)malloc(sizeof(qpsolver_hpipm_ocp_workspace));
@@ -31,8 +38,6 @@ qpsolver_hpipm_ocp_workspace* qpsolver_hpipm_ocp_workspace_create(model_size *si
     work->nbx_v = (int*)malloc((N+1)*sizeof(int));
     work->ng_v = (int*)malloc((N+1)*sizeof(int));
     work->ns_v = (int*)malloc((N+1)*sizeof(int));
-    work->ptr_idx = (int*)malloc((N+1)*nu*sizeof(int));
-    work->multiplier = (double*)malloc((2*(N+1)*nu+2*N*nbg+2*nbgN)*sizeof(double));
 
     work->b0 = (double*)malloc(nx*sizeof(double));
     work->r0 = (double*)malloc(nu*sizeof(double));
@@ -43,14 +48,14 @@ qpsolver_hpipm_ocp_workspace* qpsolver_hpipm_ocp_workspace_create(model_size *si
     work->hB = (double**)malloc(N*sizeof(double*));
     work->hb = (double**)malloc(N*sizeof(double*));
     work->hQ = (double**)malloc((N+1)*sizeof(double*));
-    work->hS = (double**)malloc(N*sizeof(double*));
-    work->hR = (double**)malloc(N*sizeof(double*));
+    work->hS = (double**)malloc((N+1)*sizeof(double*));
+    work->hR = (double**)malloc((N+1)*sizeof(double*));
     work->hq = (double**)malloc((N+1)*sizeof(double*));
-    work->hr = (double**)malloc(N*sizeof(double*));
+    work->hr = (double**)malloc((N+1)*sizeof(double*));
     work->hlb = (double**)malloc((N+1)*sizeof(double*));
     work->hub = (double**)malloc((N+1)*sizeof(double*));
     work->hC = (double**)malloc((N+1)*sizeof(double*));
-    work->hD = (double**)malloc(N*sizeof(double*));
+    work->hD = (double**)malloc((N+1)*sizeof(double*));
     work->hlg = (double**)malloc((N+1)*sizeof(double*));
     work->hug = (double**)malloc((N+1)*sizeof(double*));
     work->hidxb = (int**)malloc((N+1)*sizeof(int*));
@@ -73,9 +78,13 @@ void qpsolver_hpipm_ocp_workspace_init(model_size *size,
     
     int nx = size->nx;
     int nu = size->nu;
+    int nbx = size->nbx;
+    int nbu = size->nbu;
     int nbg = size->nbg;
     int nbgN = size->nbgN;
     int N = size->N;
+    int *nbx_idx = size->nbx_idx;
+    int *nbu_idx = size->nbu_idx;
 
     int *nx_v = work->nx_v;
     int *nu_v = work->nu_v;
@@ -83,6 +92,12 @@ void qpsolver_hpipm_ocp_workspace_init(model_size *size,
     int *nbu_v =work->nbu_v;
     int *ng_v = work->ng_v;
     int *ns_v = work->ns_v;
+
+    int **hidxb = work->hidxb;
+    double **hlam_lb = work->hlam_lb;
+    double **hlam_ub = work->hlam_ub;
+    double **hlam_lg = work->hlam_lg;
+    double **hlam_ug = work->hlam_ug;
     
     nx_v[0] = 0;
 	for(ii=1; ii<=N; ii++)
@@ -93,11 +108,12 @@ void qpsolver_hpipm_ocp_workspace_init(model_size *size,
 	nu_v[N] = 0;
 
     for(ii=0; ii<N; ii++)
-        nbu_v[ii] = nu;
+        nbu_v[ii] = nbu;
 	nbu_v[N] = 0;
 
-	for(ii=0; ii<=N; ii++)
-        nbx_v[ii] = 0;
+    nbx_v[0] = 0;
+	for(ii=1; ii<=N; ii++)
+        nbx_v[ii] = nbx;
 
     for(ii=0; ii<N; ii++)
 		ng_v[ii] = nbg;
@@ -106,8 +122,18 @@ void qpsolver_hpipm_ocp_workspace_init(model_size *size,
     for(ii=0; ii<=N; ii++)
 		ns_v[ii] = 0;
 
+    for(ii=0;ii<=N;ii++){
+        int_zeros(hidxb+ii, nbu_v[ii]+nbx_v[ii], 1);
+        d_zeros(hlam_lb+ii, nbu_v[ii]+nbx_v[ii], 1);
+        d_zeros(hlam_ub+ii, nbu_v[ii]+nbx_v[ii], 1);
+        d_zeros(hlam_lg+ii, ng_v[ii], 1);
+        d_zeros(hlam_ug+ii, ng_v[ii], 1);
+    }
 
     d_cvt_int_to_ocp_qp_dim(N, nx_v, nu_v, nbx_v, nbu_v, ng_v, ns_v, work->ocp_dim);
+
+	// for(ii=0; ii<=N; ii++)
+	// 	printf("\n%d %d %d %d %d\n", nx_v[ii], nu_v[ii], nbx_v[ii], nbu_v[ii], ng_v[ii]);
 
     int qp_size = d_memsize_ocp_qp(work->ocp_dim);
 	work->qp_mem = calloc(qp_size,1);
@@ -163,11 +189,11 @@ void qpsolver_hpipm_ocp_workspace_init(model_size *size,
 	for(ii=1; ii<N; ii++)
 		work->hr[ii] = qp->gu+ii*nu;
 
-	for(ii=0; ii<N; ii++)
-		work->hlb[ii] = qp->lb_u+ii*nu;
+	for(ii=0; ii<=N; ii++)
+		work->hlb[ii] = qp->lb+ii*(nbu+nbx);
 
-	for(ii=0; ii<N; ii++)
-		work->hub[ii] = qp->ub_u+ii*nu;
+	for(ii=0; ii<=N; ii++)
+		work->hub[ii] = qp->ub+ii*(nbu+nbx);
 
 	for(ii=1; ii<N; ii++)
 		work->hC[ii] = qp->C+ii*nbg*nx;
@@ -175,6 +201,7 @@ void qpsolver_hpipm_ocp_workspace_init(model_size *size,
 
 	for(ii=0; ii<N; ii++)
 		work->hD[ii] = qp->D+ii*nbg*nu;
+    work->hD[N] = qp->DN;
 
 	work->hlg[0] = work->lg0;
 	for(ii=1; ii<=N; ii++)
@@ -186,9 +213,10 @@ void qpsolver_hpipm_ocp_workspace_init(model_size *size,
 
     for(ii=0; ii<=N; ii++)
 	{
-        work->hidxb[ii] = work->ptr_idx+ii*nu;
-		for(jj=0; jj<nu; jj++)
-			work->hidxb[ii][jj] = jj;
+		for(jj=0; jj<nbu_v[ii]; jj++)
+			work->hidxb[ii][jj] = nbu_idx[jj];
+        for(jj=0; jj<nbx_v[ii]; jj++)
+			work->hidxb[ii][nbu_v[ii]+jj] = nbu_v[ii]+nbx_idx[jj];
 	}
 	
 	for(ii=0; ii<=N; ii++)
@@ -199,14 +227,6 @@ void qpsolver_hpipm_ocp_workspace_init(model_size *size,
 	
 	for(ii=0; ii<N; ii++)
 		work->hpi[ii] = out->lam+(ii+1)*nx;
-
-    for(ii=0; ii<=N; ii++)
-    {
-		work->hlam_lb[ii] = work->multiplier+ii*nu;
-		work->hlam_ub[ii] = work->multiplier+(N+1)*nu+ii*nu;
-		work->hlam_lg[ii] = work->multiplier+2*(N+1)*nu+ii*nbg;
-        work->hlam_ug[ii] = work->multiplier+2*(N+1)*nu+N*nbg+nbgN+ii*nbg;
-    }
     
 }
 
@@ -247,24 +267,24 @@ int qpsolver_hpipm_ocp(model_size *size, qp_problem *qp, qp_out *out, qpsolver_h
 
     d_cvt_colmaj_to_ocp_qp(hA, hB, hb, hQ, hS, hR, hq, hr, hidxb, hlb, hub, hC, hD, hlg, hug, NULL, NULL, NULL, NULL, NULL, hpipm_ocp_work->ocp_qp);
 
-    int hpipm_return = d_solve_ocp_qp_ipm(hpipm_ocp_work->ocp_qp, hpipm_ocp_work->ocp_sol,
+    d_solve_ocp_qp_ipm(hpipm_ocp_work->ocp_qp, hpipm_ocp_work->ocp_sol,
         hpipm_ocp_work->ocp_arg, hpipm_ocp_work->ocp_workspace);
 
     d_cvt_ocp_qp_sol_to_colmaj(hpipm_ocp_work->ocp_sol, hu, hx, NULL, NULL, hpi, hlam_lb, hlam_ub, hlam_lg, hlam_ug, NULL, NULL);
 
-    return hpipm_return;
+    return 0;
 }
 
-void qpsolver_hpipm_ocp_workspace_free(qpsolver_hpipm_ocp_workspace* work)
+void qpsolver_hpipm_ocp_workspace_free(model_size *size, qpsolver_hpipm_ocp_workspace* work)
 { 
+    int N = size->N;
+    
     free(work->nx_v);
     free(work->nu_v);
     free(work->nbx_v);
     free(work->nbu_v);
     free(work->ng_v);
     free(work->ns_v);
-    free(work->ptr_idx);
-    free(work->multiplier);
 
     free(work->ocp_dim);
     free(work->ocp_qp);
@@ -292,6 +312,15 @@ void qpsolver_hpipm_ocp_workspace_free(qpsolver_hpipm_ocp_workspace* work)
     free(work->hD);
     free(work->hlg);
     free(work->hug);
+
+    int i;
+    for(i=0;i<=N;i++){
+        int_free(work->hidxb[i]);
+        d_free(work->hlam_lb[i]);
+        d_free(work->hlam_ub[i]);
+        d_free(work->hlam_lg[i]);
+        d_free(work->hlam_ug[i]);
+    }
     free(work->hidxb);
 
     free(work->b0);

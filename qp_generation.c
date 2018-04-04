@@ -19,6 +19,8 @@ qp_in* qp_in_create(model_size *size)
     int ny=size->ny;
     int nyN=size->nyN;
     int np=size->np;
+    int nbx = size->nbx;
+    int nbu = size->nbu;
     int nbg = size->nbg;
     int nbgN = size->nbgN;
     int N = size->N;
@@ -32,8 +34,8 @@ qp_in* qp_in_create(model_size *size)
     in->W = (double*)calloc(ny*ny,sizeof(double));
     in->WN = (double*)calloc(nyN*nyN,sizeof(double));
     in->p = (double*)calloc((N+1)*np,sizeof(double));
-    in->lbu = (double*)calloc(nu,sizeof(double));
-    in->ubu = (double*)calloc(nu,sizeof(double));
+    in->lb = (double*)calloc(nbu+nbx,sizeof(double));
+    in->ub = (double*)calloc(nbu+nbx,sizeof(double));
     in->lbg = (double*)calloc(nbg,sizeof(double));
     in->ubg = (double*)calloc(nbg,sizeof(double));
     in->lbgN = (double*)calloc(nbgN,sizeof(double));
@@ -46,27 +48,30 @@ qp_problem* qp_problem_create(model_size *size)
 {
     int nx=size->nx;
     int nu=size->nu;
+    int nbx = size->nbx;
+    int nbu = size->nbu;
     int nbg = size->nbg;
     int nbgN = size->nbgN;
     int N = size->N;
 
     qp_problem *qp = (qp_problem*)malloc(sizeof(qp_problem));
 
-    qp->Q = (double*)malloc((N+1)*nx*nx*sizeof(double));
-    qp->S = (double*)malloc(N*nx*nu*sizeof(double));
-    qp->R = (double*)malloc(N*nu*nu*sizeof(double));
-    qp->A = (double*)malloc(N*nx*nx*sizeof(double));
-    qp->B = (double*)malloc(N*nx*nu*sizeof(double));
-    qp->b = (double*)malloc(N*nx*sizeof(double));
-    qp->C = (double*)malloc(N*nbg*nx*sizeof(double));
-    qp->CN = (double*)malloc(nbgN*nx*sizeof(double));
-    qp->D = (double*)malloc(N*nbg*nu*sizeof(double));
-    qp->gx = (double*)malloc(nx*(N+1)*sizeof(double));
-    qp->gu = (double*)malloc(nu*N*sizeof(double));
-    qp->lb_u = (double*)malloc(nu*N*sizeof(double));
-    qp->ub_u = (double*)malloc(nu*N*sizeof(double));
-    qp->lb_g = (double*)malloc((nbg*N+nbgN)*sizeof(double));
-    qp->ub_g = (double*)malloc((nbg*N+nbgN)*sizeof(double));
+    qp->Q = (double*)calloc((N+1)*nx*nx,sizeof(double));
+    qp->S = (double*)calloc((N+1)*nx*nu,sizeof(double));
+    qp->R = (double*)calloc((N+1)*nu*nu,sizeof(double));
+    qp->A = (double*)calloc(N*nx*nx,sizeof(double));
+    qp->B = (double*)calloc(N*nx*nu,sizeof(double));
+    qp->b = (double*)calloc(N*nx,sizeof(double));
+    qp->C = (double*)calloc(N*nbg*nx,sizeof(double));
+    qp->CN = (double*)calloc(nbgN*nx,sizeof(double));
+    qp->D = (double*)calloc(N*nbg*nu,sizeof(double));
+    qp->DN = (double*)calloc(nbgN*nu,sizeof(double));
+    qp->gx = (double*)calloc(nx*(N+1),sizeof(double));
+    qp->gu = (double*)calloc(nu*(N),sizeof(double));
+    qp->lb = (double*)calloc((nbu+nbx)*N+nbx,sizeof(double));
+    qp->ub = (double*)calloc((nbu+nbx)*N+nbx,sizeof(double));
+    qp->lb_g = (double*)calloc(nbg*N+nbgN,sizeof(double));
+    qp->ub_g = (double*)calloc(nbg*N+nbgN,sizeof(double));
 
     return qp;
 }
@@ -81,9 +86,9 @@ qp_generation_workspace* qp_generation_workspace_create(model_size *size)
     qp_generation_workspace *work = (qp_generation_workspace*)malloc(sizeof(qp_generation_workspace));
 
     work->Jac = (double**)malloc(2*sizeof(double*));
-    work->Jac[0] = (double*)malloc(ny*nx*sizeof(double));
-    work->Jac[1] = (double*)malloc(ny*nu*sizeof(double));
-    work->Jac_N = (double*)malloc(nyN*nx*sizeof(double));
+    work->Jac[0] = (double*)calloc(ny*nx,sizeof(double));
+    work->Jac[1] = (double*)calloc(ny*nu,sizeof(double));
+    work->Jac_N = (double*)calloc(nyN*nx,sizeof(double));
 
     return work;
 }
@@ -114,9 +119,13 @@ int qp_generation(qp_in *in, model_size *size,
     int ny = size->ny;
     int nyN = size->nyN;
     int np = size->np;
+    int nbx = size->nbx;
+    int nbu = size->nbu;
     int nbg = size->nbg;
     int nbgN = size->nbgN;
     int N = size->N;
+    int *nbx_idx = size->nbx_idx;
+    int *nbu_idx = size->nbu_idx;
 
     double *x = in->x;
     double *u = in->u;
@@ -125,8 +134,8 @@ int qp_generation(qp_in *in, model_size *size,
     double *W = in->W;
     double *WN = in->WN;
     double *p = in->p;
-    double *lbu = in->lbu;
-    double *ubu = in->ubu;
+    double *lb = in->lb;
+    double *ub = in->ub;
     double *lbg = in->lbg;
     double *ubg = in->ubg;
     double *lbgN = in->lbgN;
@@ -143,8 +152,8 @@ int qp_generation(qp_in *in, model_size *size,
     double *gx = qp->gx;
     double *gu = qp->gu;   
     double *b = qp->b;
-    double *lb_u = qp->lb_u;
-    double *ub_u = qp->ub_u;
+    double *lb_dux = qp->lb;
+    double *ub_dux = qp->ub;
     double *lb_g = qp->lb_g;
     double *ub_g = qp->ub_g;
    
@@ -171,9 +180,15 @@ int qp_generation(qp_in *in, model_size *size,
         casadi_in[3] = y+i*ny;
         
         // control bounds
-        for (j=0;j<nu;j++){
-            lb_u[i*nu+j] = lbu[j]-u[i*nu+j];
-            ub_u[i*nu+j] = ubu[j]-u[i*nu+j];
+        for (j=0;j<nbu;j++){
+            lb_dux[i*(nbu+nbx)+j] = lb[j]-u[i*nu+nbu_idx[j]];
+            ub_dux[i*(nbu+nbx)+j] = ub[j]-u[i*nu+nbu_idx[j]];
+        }
+
+        // state bounds
+        for (j=0;j<nbx;j++){
+            lb_dux[i*(nbu+nbx)+nbu+j] = lb[nbu+j]-x[i*nx+nbx_idx[j]];
+            ub_dux[i*(nbu+nbx)+nbu+j] = ub[nbu+j]-x[i*nx+nbx_idx[j]];
         }
         
         // integration                             
@@ -192,7 +207,7 @@ int qp_generation(qp_in *in, model_size *size,
         // Hessian
         Ji_Fun(casadi_in, Jac);
         dsyrk_(UPLO, Trans, &nx, &ny, &one_d, Jac[0], &ny, &zero, Q+i*nx*nx, &nx);
-        dgemm_(Trans, nTrans, &nx, &nu, &ny, &one_d, Jac[0], &ny, Jac[1], &ny, &zero, S+i*nx*nu, &nx);
+        dgemm_(Trans, nTrans, &nu, &nx, &ny, &one_d, Jac[1], &ny, Jac[0], &ny, &zero, S+i*nx*nu, &nu); // S^T
         dsyrk_(UPLO, Trans, &nu, &ny, &one_d, Jac[1], &ny, &zero, R+i*nu*nu, &nu);
                 
         // gradient
@@ -221,6 +236,11 @@ int qp_generation(qp_in *in, model_size *size,
     casadi_in[1] = p+N*np;
     casadi_in[2] = yN;
     casadi_in[3] = WN;
+
+    for (j=0;j<nbx;j++){
+        lb_dux[N*(nbu+nbx)+j] = lb[nbu+j]-x[N*nx+nbx_idx[j]];
+        ub_dux[N*(nbu+nbx)+j] = ub[nbu+j]-x[N*nx+nbx_idx[j]];
+    }
     
     JN_Fun(casadi_in, Jac_N);
     dsyrk_(UPLO, Trans, &nx, &nyN, &one_d, Jac_N, &nyN, &zero, Q+N*nx*nx, &nx);
@@ -244,7 +264,7 @@ int qp_generation(qp_in *in, model_size *size,
     // print_matrix(Q+N*nx*nx, nx, nx);
 
     // printf("S1=\n");
-    // print_matrix(S+nx*nu, nx, nu);
+    // print_matrix(S+nx*nu, nu, nx);
 
     // printf("R1=\n");
     // print_matrix(R+nu*nu, nu, nu);
@@ -270,11 +290,11 @@ int qp_generation(qp_in *in, model_size *size,
     // printf("CN=\n");
     // print_matrix(CN, nbgN, nx);
 
-    // printf("lb_u=\n");
-    // print_vector_trans(lb_u, N*nu);
+    // printf("lb=\n");
+    // print_vector_trans(lb_dux, N*(nbu+nbx)+nbx);
 
-    // printf("ub_u=\n");
-    // print_vector_trans(ub_u, N*nu);
+    // printf("ub=\n");
+    // print_vector_trans(ub_dux, N*(nbu+nbx)+nbx);
 
     // printf("lb_g=\n");
     // print_vector_trans(lb_g, N*nbg+nbgN);
@@ -291,23 +311,12 @@ int expand(model_size *size, qp_problem *qp, qp_out *out)
     int nx = size->nx;
     int nu = size->nu;
     int N = size->N;
-    // int nbg = size->nbg;
-    // int nbgN = size->nbgN;
 
     double *dx = out->dx;
     double *du = out->du;
-    // double *lambda = out->lam;
-    // double *mu = out->mu;
 
     double *A = qp->A;
     double *B = qp->B;
-    // double *Q = qp->Q;
-    // double *S = qp->S;
-    // double *R = qp->R;
-    // double *C = qp->C;
-    // double *CN = qp->CN;
-
-    // double *gx = qp->gx;
     double *b = qp->b;
 
     int i;
@@ -321,12 +330,6 @@ int expand(model_size *size, qp_problem *qp, qp_out *out)
         dgemv_(nTrans,&nx,&nu,&one_d,B+i*nx*nu,&nx,du+i*nu,&one_i,&one_d,dx+(i+1)*nx,&one_i);
     }
 
-    // memcpy(lambda+N*nx, gx+N*nx, nx*sizeof(double));
-    // dgemv(nTrans,&nx,&nx,&one_d,Q+N*nx*nx,&nx,dx+N*nx,&one_i,&one_d,lambda+N*nx,&one_i);
-    // if (nbgN>0){
-    //     dgemv(Trans,&nbgN,&nx,&one_d,CN,&nbgN,muN,&one_i,&one_d,lambda+N*nx,&one_i);
-    // }
-
     return 0;
  }
 
@@ -338,8 +341,8 @@ void qp_in_free(qp_in *in){
     free(in->W);
     free(in->WN);
     free(in->p);
-    free(in->lbu);
-    free(in->ubu);
+    free(in->lb);
+    free(in->ub);
     free(in->lbg);
     free(in->ubg);
     free(in->lbgN);
@@ -360,8 +363,8 @@ void qp_problem_free(qp_problem *qp){
     free(qp->C);
     free(qp->CN);
     free(qp->D);
-    free(qp->lb_u);
-    free(qp->ub_u);
+    free(qp->lb);
+    free(qp->ub);
     free(qp->lb_g);
     free(qp->ub_g);
 

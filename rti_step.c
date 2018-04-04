@@ -5,6 +5,7 @@
 #include "rti_step.h"
 #include "common.h"
 #include "qpsolver_hpipm_ocp.h"
+#include "qpsolver_hpipm_pcond.h"
 #include "qp_generation.h"
 #include "full_condensing.h"
 
@@ -20,10 +21,7 @@ rti_step_workspace* rti_step_workspace_create(model_size *size)
     work->qp_work = qp_generation_workspace_create(size);
     work->out = qp_out_create(size);
     work->hpipm_ocp_work = qpsolver_hpipm_ocp_workspace_create(size);
-
-    work->full_condensing_work = full_condensing_workspace_create(size);
-    work->qore_work = qpsolver_qore_workspace_create(size);
-
+    work->hpipm_pcond_work = qpsolver_hpipm_pcond_workspace_create(size);
 
     work->dx0 = (double*)malloc(size->nx * sizeof(double));
     work->u_opt = (double*)calloc(size->nu , sizeof(double));
@@ -35,15 +33,16 @@ void rti_step_init(model_size *size, rti_step_workspace *rti_work)
 {
     qpsolver_hpipm_ocp_workspace_init(size, rti_work->qp,
         rti_work->out, rti_work->hpipm_ocp_work);
+
+    qpsolver_hpipm_pcond_workspace_init(size, rti_work->qp,
+        rti_work->out, rti_work->hpipm_pcond_work);
     
 }
 
 int rti_step(double *x0, model_size *size, rti_opt *opt, rti_step_workspace *rti_work)
 {
-    CMPC_timer tprep;
-    CMPC_timer tcond;
-    CMPC_timer tqore;
-    CMPC_timer thpipm;
+    Timer tprep;
+    Timer thpipm;
 
     int jj;
 
@@ -56,15 +55,13 @@ int rti_step(double *x0, model_size *size, rti_opt *opt, rti_step_workspace *rti
     qp_generation_workspace *qp_work=rti_work->qp_work;
     qp_out *out=rti_work->out;
     qpsolver_hpipm_ocp_workspace *hpipm_ocp_work = rti_work->hpipm_ocp_work;
-    full_condensing_workspace *full_condensing_work = rti_work->full_condensing_work;
-    qpsolver_qore_workspace *qore_work = rti_work->qore_work;
+    qpsolver_hpipm_pcond_workspace *hpipm_pcond_work = rti_work->hpipm_pcond_work;
 
     qp_work->sample = rti_work->sample;
 
-    tprep=CMPC_tic(tprep);
+    Tic(&tprep);
     qp_generation(in, size, qp, out, qp_work);
-    tprep=CMPC_toc(tprep);
-    rti_work->cpt_prep = tprep.t;
+    rti_work->cpt_prep = Toc(&tprep);
 
     set_zeros((N+1)*nx, out->dx);
     for(jj=0;jj<nx;jj++)
@@ -78,30 +75,18 @@ int rti_step(double *x0, model_size *size, rti_opt *opt, rti_step_workspace *rti
     /* call qp solver */
     switch (opt->qpsolver){
         case 0:
-            rti_work->cpt_qp_sparse =0;
-            tcond=CMPC_tic(tcond);
-            full_condensing(dx0, size, qp, full_condensing_work);
-            tcond=CMPC_toc(tcond);
-            rti_work->cpt_cond = tcond.t;
-        
-            tqore=CMPC_tic(tqore);
-            qpsolver_qore(size, qp, full_condensing_work,
-                qore_work, out, rti_work->sample);
-            tqore=CMPC_toc(tqore);
-            rti_work->cpt_qp_dense = tqore.t;
-
-            memcpy(out->dx, dx0, nx*sizeof(double));
-            expand(size, qp, out);
-
-            break;
-        case 1:
             rti_work->cpt_cond = 0;
-            rti_work->cpt_qp_dense =0;
-            thpipm=CMPC_tic(thpipm);
+            Tic(&thpipm);
             qpsolver_hpipm_ocp(size, qp, out, hpipm_ocp_work);
-            thpipm=CMPC_toc(thpipm);
-            rti_work->cpt_qp_sparse = thpipm.t;
+            rti_work->cpt_ocp_qp = Toc(&thpipm);
             break;
+
+        case 1:
+            qpsolver_hpipm_pcond(size, qp, out, hpipm_pcond_work);
+            rti_work->cpt_cond = hpipm_pcond_work->tcond;
+            rti_work->cpt_ocp_qp = hpipm_pcond_work->tqp;
+            break;
+            
         default:
             printf("Please choose a supported QP solver!");
     }
@@ -130,15 +115,14 @@ int rti_step(double *x0, model_size *size, rti_opt *opt, rti_step_workspace *rti
 }
 
 
-void rti_step_workspace_free(rti_step_workspace *work)
+void rti_step_workspace_free(model_size *size, rti_step_workspace *work)
 {
     qp_in_free(work->in);
     qp_problem_free(work->qp);
     qp_generation_workspace_free(work->qp_work);
     qp_out_free(work->out);
-    qpsolver_hpipm_ocp_workspace_free(work->hpipm_ocp_work);
-    full_condensing_workspace_free(work->full_condensing_work);
-    qpsolver_qore_workspace_free(work->qore_work);
+    qpsolver_hpipm_ocp_workspace_free(size, work->hpipm_ocp_work);
+    qpsolver_hpipm_pcond_workspace_free(size, work->hpipm_pcond_work);
 
     free(work->dx0);
     free(work->u_opt);

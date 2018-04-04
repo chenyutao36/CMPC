@@ -11,8 +11,6 @@ typedef struct{
     int *nbu_v;
     int *ng_v;
     int *ns_v;
-    int *ptr_idx;
-    double *multiplier;
 
     struct d_ocp_qp_dim *ocp_dim;
     struct d_ocp_qp *ocp_qp;
@@ -63,6 +61,6 @@ void qpsolver_hpipm_ocp_workspace_init(model_size *size,
 
 int qpsolver_hpipm_ocp(model_size *size, qp_problem *qp, qp_out *out, qpsolver_hpipm_ocp_workspace *hpipm_ocp_work);
 
-void qpsolver_hpipm_ocp_workspace_free(qpsolver_hpipm_ocp_workspace* work);
+void qpsolver_hpipm_ocp_workspace_free(model_size *size, qpsolver_hpipm_ocp_workspace* work);
 
 #endif

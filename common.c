@@ -103,18 +103,19 @@ void dgemv_n_3l(int m, int n, double alpha, double *A, int lda, double *x, doubl
 	
 	}
 
-CMPC_timer CMPC_tic(CMPC_timer timer)
+void Tic(Timer *timer)
 {
-    gettimeofday(&timer.tic, NULL);
-    return timer;
+    gettimeofday(&timer->t1, 0);
 }
 
-CMPC_timer CMPC_toc(CMPC_timer timer)
+double Toc(Timer *timer)
 {
-    gettimeofday(&timer.toc, NULL);
+    gettimeofday(&timer->t2, 0);
 
-    timer.t=(double) (timer.toc.tv_usec - timer.tic.tv_usec) / 1000000 +
-         (double) (timer.toc.tv_sec - timer.tic.tv_sec);
+    double elapsedTime;
 
-    return timer;
+    elapsedTime = (timer->t2.tv_sec - timer->t1.tv_sec)*1000;      // sec to ms
+    elapsedTime += (timer->t2.tv_usec - timer->t1.tv_usec) / 1000.0;   // us to ms
+
+    return elapsedTime;
 }

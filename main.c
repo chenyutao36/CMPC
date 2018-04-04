@@ -29,9 +29,12 @@ int main()
     int ny = 5;
     int nyN = 4;
     int np = 1;
-    int nbg = 1;
-    int nbgN = 1;
+    int nbx = 1;
+    int nbu = 1;
+    int nbg = 0;
+    int nbgN = 0;
     int N = 40;
+    int N2 = 5;
 
     /* Initialize initial condition */
 
@@ -41,9 +44,18 @@ int main()
     size.ny = ny;
     size.nyN = nyN;
     size.np = np;
+    size.nbx = nbx;
+    size.nbu = nbu;
     size.nbg = nbg;
     size.nbgN = nbgN;
     size.N = N;
+    size.N2 = N2;
+    size.nbx_idx = (int *)malloc(nbx*sizeof(int));
+    size.nbu_idx = (int *)malloc(nbu*sizeof(int));
+    size.nbx_idx[0] = 0;
+    size.nbu_idx[0] = 0;
+
+    printf("model size created\n");
     
     double *x0 = calloc(nx, sizeof(double));
 
@@ -92,6 +104,7 @@ int main()
     x0[1] = PI;
 
     rti_step_workspace *rti_work= rti_step_workspace_create(&size);
+    printf("rti workspace created\n");
 
     qp_in *in = rti_work->in;
 
@@ -108,32 +121,29 @@ int main()
     in->W[0] = 10; in->W[1*ny+1]=10; in->W[2*ny+2]=0.1; in->W[3*ny+3]=0.1; in->W[4*ny+4]=0.01; 
     in->WN[0] = 10; in->WN[1*nyN+1]=10; in->WN[2*nyN+2]=0.1; in->WN[3*nyN+3]=0.1; 
 
-    for (i=0;i<nu;i++){
-        in->lbu[i] = -20;
-        in->ubu[i] = 20;
+    for (i=0;i<nbu;i++){
+        in->lb[i] = -20;
+        in->ub[i] = 20;
     }
 
-    for (i=0;i<nbg;i++){
-        in->lbg[i] = -2;
-        in->ubg[i] = 2;
-    }
-
-    for (i=0;i<nbgN;i++){
-        in->lbgN[i] = -2;
-        in->ubgN[i] = 2;
+    for (i=0;i<nbx;i++){
+        in->lb[nbu+i] = -2;
+        in->ub[nbu+i] = 2;
     }
 
     /* start simulation */
 
-    
+
     rti_work->sample = 0;
     rti_step_init(&size, rti_work);
 
+    printf("rti workspace initialized\n");
+
     rti_opt opt;
-    opt.qpsolver=0;
+    opt.qpsolver=1;
     opt.shifting=1;
     
-    CMPC_timer t;
+    Timer timer;
     double *xf = malloc(nx*sizeof(double));
     
     double ct=0, Tf=4, Ts=0.05;
@@ -158,10 +168,12 @@ int main()
     simu_in[2] = rti_work->in->p;
     simu_out[0] = xf;
 
+    double t=0;
+
     while(ct<Tf){
-        t=CMPC_tic(t);  
+        Tic(&timer);  
         rti_step(x0, &size, &opt, rti_work);
-        t=CMPC_toc(t);
+        t=Toc(&timer);
 
         /* feedback to system */              
         F_Fun(simu_in, simu_out);
@@ -182,20 +194,16 @@ int main()
         printf("Time: %4.2f  ", ct);
 
         printf("CPT:");
-        printf("%8.6f ms  ", t.t*1E3);
+        printf("%8.6f ms  ", t);
 
         printf("Prep:");
-        printf("%8.6f ms ", rti_work->cpt_prep *1E3);
+        printf("%8.6f ms ", rti_work->cpt_prep);
 
         printf("Cond:");
-        printf("%8.6f ms ", rti_work->cpt_cond*1E3);
+        printf("%8.6f ms ", rti_work->cpt_cond);
 
-        printf("dQP:");
-        printf("%8.6f ms ", rti_work->cpt_qp_dense*1E3);
-
-        printf("sQP:");
-        printf("%8.6f ms\n", rti_work->cpt_qp_sparse*1E3);
-
+        printf("QP:");
+        printf("%8.6f ms \n", rti_work->cpt_ocp_qp);
         
     }
     
@@ -204,7 +212,7 @@ int main()
     free(x0);  
     free(xf);  
     fclose(f);
-    rti_step_workspace_free(rti_work);
+    rti_step_workspace_free(&size, rti_work);
   
     return 0;
     

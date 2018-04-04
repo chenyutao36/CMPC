@@ -11,8 +11,8 @@ typedef struct{
     double *W;
     double *WN;
     double *p;
-    double *lbu;
-    double *ubu;
+    double *lb;
+    double *ub;
     double *lbg;
     double *ubg;
     double *lbgN;
@@ -31,8 +31,9 @@ typedef struct{
     double *C;
     double *CN;
     double *D;
-    double *lb_u;
-    double *ub_u;
+    double *DN;
+    double *lb;
+    double *ub;
     double *lb_g;
     double *ub_g;
 }qp_problem;

@@ -3,7 +3,7 @@ OPENBLAS_PATH = /opt/OpenBLAS
 BLASFEO_PATH = /opt/blasfeo
 HPIPM_PATH = /opt/hpipm
 QORE_PATH = /home/chen/Documents/Packages/QORE
-CFLAGS=-Wall 
+CFLAGS=-Wall -O2 -march=native -mfpmath=sse
 OPENBLAS_LIB=$(OPENBLAS_PATH)/lib/libopenblas_haswellp-r0.2.20.a 
 HPIPM_LIB =$(HPIPM_PATH)/lib/libhpipm.a
 BLASFEO_LIB= $(BLASFEO_PATH)/lib/libblasfeo.a
@@ -17,15 +17,16 @@ OBJ += casadi_wrapper.o
 OBJ += casadi_src.o
 OBJ += qp_generation.o
 OBJ += qpsolver_hpipm_ocp.o
+OBJ += qpsolver_hpipm_pcond.o
 OBJ += rti_step.o
-OBJ += full_condensing.o
-OBJ += qpsolver_qore.o
+# OBJ += full_condensing.o
+# OBJ += qpsolver_qore.o
 
 # all: $(OBJ)
 all: main
 
 main: $(OBJ)
-	$(CC) $(CFLAGS) $(OBJ) -I.. -I$(OPENBLAS_PATH)/include $(OPENBLAS_LIB) -I$(HPIPM_PATH)/include -I$(BLASFEO_PATH)/include $(HPIPM_LIB) -I$(BLASFEO_PATH)/include $(BLASFEO_LIB) -I$(QORE_PATH) -I$(QORE_PATH)/QPSOLVER_DENSE/include $(QORE_LIB) -o main -lm -lpthread -lrt -lblas -L$(QORE_BLAS) -lblasfeo
+	$(CC) $(CFLAGS) $(OBJ) -I.. -I$(OPENBLAS_PATH)/include $(OPENBLAS_LIB) -I$(HPIPM_PATH)/include -I$(BLASFEO_PATH)/include $(HPIPM_LIB) -I$(BLASFEO_PATH)/include $(BLASFEO_LIB) -o main -lm -lpthread
 
 main.o: main.c
 	$(CC) $(CFLAGS) -c main.c
@@ -35,6 +36,9 @@ rti_step.o: rti_step.c rti_step.h
 
 qpsolver_hpipm_ocp.o: qpsolver_hpipm_ocp.c qpsolver_hpipm_ocp.h
 	$(CC) $(CFLAGS) -I.. -I$(HPIPM_PATH)/include -I$(BLASFEO_PATH)/include -c qpsolver_hpipm_ocp.c
+
+qpsolver_hpipm_pcond.o: qpsolver_hpipm_pcond.c qpsolver_hpipm_pcond.h
+	$(CC) $(CFLAGS) -I.. -I$(HPIPM_PATH)/include -I$(BLASFEO_PATH)/include -c qpsolver_hpipm_pcond.c
 
 qp_generation.o: qp_generation.c qp_generation.h
 	$(CC) $(CFLAGS) -c qp_generation.c
@@ -49,7 +53,7 @@ common.o: common.c common.h
 	$(CC) $(CFLAGS) -c common.c
 
 full_condensing.o: full_condensing.c full_condensing.h
-	$(CC) $(CFLAGS) -c full_condensing.c
+	$(CC) $(CFLAGS) -I.. -I$(BLASFEO_PATH)/include -c full_condensing.c
 
 qpsolver_qore.o: qpsolver_qore.c qpsolver_qore.h
 	$(CC) $(CFLAGS) -I.. -I$(QORE_PATH) -I$(QORE_PATH)/QPSOLVER_DENSE/include -c qpsolver_qore.c

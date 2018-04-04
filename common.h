@@ -9,21 +9,26 @@ typedef struct{
     int ny;
     int nyN;
     int np;
+    int nbx;
+    int nbu;
     int nbg;
     int nbgN;
     int N;
+    int N2;
+
+    int *nbx_idx;
+    int *nbu_idx;
 }model_size;
 
 typedef struct{
-    int qpsolver; // 0:qore, 1:hpipm_ocp
+    int qpsolver; // 0:qore, 1:hpipm_ocp, 2:hpipm_pcond
     int shifting; // 0:no, 1: yes
 }rti_opt;
 
 typedef struct{
-    struct timeval tic;
-    struct timeval toc;
-    double t;
-}CMPC_timer;
+    struct timeval t1;
+    struct timeval t2;
+}Timer;
 
 void Block_Fill(int m, int n, double *Gi, double *G,
      int idm, int idn, int ldG);
@@ -45,8 +50,9 @@ void regularization(int n, double *A, double reg);
 
 void dgemv_n_3l(int m, int n, double alpha, double *A, int lda, double *x, double beta, double *y, double *z);
 
-CMPC_timer CMPC_tic(CMPC_timer timer);
+void Tic(Timer *timer);
 
-CMPC_timer CMPC_toc(CMPC_timer timer);
+double Toc(Timer *timer);
+
 
 #endif
